@@ -66,19 +66,23 @@ class SimpleSampler(object):
 
         Returns: empirical probability of query values
         """
-        # 
-        # Fill in the function body here
-        #
-        for node in self.nodes:
-            print(node.get_var())
-            print(node.get_prob_true())
-           
-        print("here")
-        print(query_vals.keys())
-        print(query_vals.keys().get_var())
-        print(self.generate_sample())
-        print(query_vals)
-        return 0.0  # Fix this line!
+        space = []
+        total = []
+        for _ in range(num_samples):
+            cur = self.generate_sample()
+            total.append(cur)
+            if (self.get_prob_helper(cur, query_vals)):
+                space.append(cur)
+        return len(space)/len(total)
+    
+    def get_prob_helper(self, cur, vals):
+        correct = 0
+        for q_var, q_val in vals.items():
+            if (cur[q_var] == q_val):
+                correct += 1
+        if (correct == len(vals)):
+            return True
+        return False
 
         
 class RejectionSampler(SimpleSampler):
@@ -96,11 +100,21 @@ class RejectionSampler(SimpleSampler):
         Returns: empirical conditional probability of query values given evidence.  N.B.: if 
         all of the generated samples are rejected, it returns None.
         """
-        # 
-        # Fill in the function body here
-        #
-        return 0.0  # Fix this line!
-
+        q_space = [] #matching from e_space
+        e_space = [] #matching from total
+        total = []
+        for _ in range(num_samples):
+            cur = self.generate_sample()
+            total.append(cur)
+            if (len(evidence_vals)==0 and self.get_prob_helper(cur, query_vals)):
+                q_space.append(cur)
+            elif (self.get_prob_helper(cur, evidence_vals) and not len(evidence_vals) == 0):
+                e_space.append(cur)
+                if (self.get_prob_helper(cur, query_vals)):
+                    q_space.append(cur)
+        if (len(evidence_vals)==0):
+            return len(q_space)/len(total) 
+        return len(q_space)/len(e_space)
 
 class LikelihoodWeightingSampler(SimpleSampler):
     """Sampler that generates samples given evidence using likelihood weighting."""
@@ -141,11 +155,21 @@ class LikelihoodWeightingSampler(SimpleSampler):
 
         Returns: empirical conditional probability of query values given evidence
         """
-        # 
-        # Fill in the function body here
-        #
-        return 0.0  # Fix this line!
-
+        q_weight = 0
+        e_weight = 0
+        total_weight = 0
+        for _ in range(num_samples):
+            cur, w = self.generate_sample(evidence_vals)
+            total_weight += w
+            if (len(evidence_vals)==0 and self.get_prob_helper(cur, query_vals)):
+                q_weight += w
+            elif (self.get_prob_helper(cur, evidence_vals) and not len(evidence_vals) == 0):
+                e_weight += w
+                if (self.get_prob_helper(cur, query_vals)):
+                    q_weight += w
+        if (len(evidence_vals)==0):
+            return q_weight/total_weight 
+        return q_weight/e_weight
 
 def compare_estimates(query, evidence, n, simp, rej, like):
     """Print out empirical estimations of posteriors using different samplers."""
@@ -169,9 +193,14 @@ def bayes_sample_size_plot(sampler1, sampler2, query, evidence, label1, label2, 
         title: plot title
         fname: path of output pdf   
     """
-    # 
-    # Fill in the function body here
-    #
+    n_s = []
+    yvals1 = []
+    yvals2 = []
+    for n in range (50, 10000, 20):
+        n_s.append(n)
+        yvals1.append(sampler1.get_prob(query, evidence, n))
+        yvals2.append(sampler2.get_prob(query, evidence, n))
+    two_line_plot(n_s, yvals1, label1, n_s, yvals2, label2, title, fname)
     return
 
 
@@ -218,22 +247,22 @@ if __name__ == '__main__':
     compare_estimates({'E': True}, {}, n, sampler_simp, sampler_reject, sampler_like)
 
     print("b. P(moxie | -palate)")
-    compare_estimates({'M': True}, {'P': False})
+    compare_estimates({'M': True}, {'P': False}, n, sampler_simp, sampler_reject, sampler_like)
 
     print("c. P(moxie)")
-    compare_estimates({'M': True}, {})
+    compare_estimates({'M': True}, {}, n, sampler_simp, sampler_reject, sampler_like)
     
     print("d. P(moxie, awesome)")
-    compare_estimates({'M': True, 'A': True}, {})
+    compare_estimates({'M': True, 'A': True}, {}, n, sampler_simp, sampler_reject, sampler_like)
 
     print("e. P(awesome)")
-    compare_estimates({'A': True}, {})
+    compare_estimates({'A': True}, {}, n, sampler_simp, sampler_reject, sampler_like)
 
     print("f. P(-palate | moxie)")
-    compare_estimates({'P': False}, {'M': True})
+    compare_estimates({'P': False}, {'M': True}, n, sampler_simp, sampler_reject, sampler_like)
     
     print("g. P(-palate | moxie, -enrolled)")
-    compare_estimates({'P': False}, {'M': True, 'E': False})
+    compare_estimates({'P': False}, {'M': True, 'E': False}, n, sampler_simp, sampler_reject, sampler_like)
 
 
     # Create a plot illustrating how different samplers converge as a function of n
